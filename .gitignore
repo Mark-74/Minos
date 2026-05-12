@@ -1,0 +1,22 @@
+# Rust build output
+/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Local config / runtime state
+/var/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+/run/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local-only project notes (not for the public repo)
+CLAUDE.md
