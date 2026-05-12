@@ -1,0 +1,22 @@
+[package]
+name = "minos-storage"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Storage trait and built-in backends (SQLite, in-memory) for Minos."
+
+[dependencies]
+minos-core = { path = "../minos-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+rusqlite = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
