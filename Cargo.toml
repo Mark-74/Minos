@@ -5,6 +5,7 @@ members = [
     "crates/minos-storage",
     "crates/minos-config",
     "crates/minos-proxy",
+    "crates/minos-filters",
 ]
 
 [workspace.package]
@@ -21,11 +22,15 @@ uuid = { version = "1", features = ["serde", "v4"] }
 thiserror = "2"
 rusqlite = { version = "0.39", features = ["bundled"] }
 arc-swap = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "macros", "sync", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "macros", "sync", "time", "process"] }
 async-trait = "0.1"
 httparse = "1"
 socket2 = "0.6"
 tracing = "0.1"
+regex = "1"
+bytes = "1"
+sha2 = "0.10"
+which = "6"
 # Test-only dependencies (consumers should declare under [dev-dependencies]).
 tempfile = "3"
 proptest = "1"

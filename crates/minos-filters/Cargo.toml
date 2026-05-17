@@ -1,0 +1,28 @@
+[package]
+name = "minos-filters"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Built-in filter kinds for Minos: regex, http, python_sidecar."
+
+[lints]
+workspace = true
+
+[dependencies]
+minos-core = { path = "../minos-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+regex = { workspace = true }
+bytes = { workspace = true }
+sha2 = { workspace = true }
+which = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
