@@ -1,25 +1,29 @@
 [package]
-name = "minos-config"
+name = "minos-proxy"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Configuration types and persistence flow for Minos."
+description = "Minos data plane: listeners, protocol handlers, pipeline executor."
+
+[lints]
+workspace = true
 
 [dependencies]
 minos-core = { path = "../minos-core" }
-minos-storage = { path = "../minos-storage" }
+minos-config = { path = "../minos-config" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
-arc-swap.workspace = true
 tokio = { workspace = true }
+arc-swap = { workspace = true }
+httparse = { workspace = true }
+async-trait = { workspace = true }
+socket2 = { workspace = true }
+tracing = { workspace = true }
+minos-storage = { path = "../minos-storage" }
 
 [dev-dependencies]
-schemars = { workspace = true }
 tempfile = { workspace = true }
-
-[lints]
-workspace = true

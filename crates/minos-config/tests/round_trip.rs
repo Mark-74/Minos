@@ -2,7 +2,9 @@
 //! back through `load_active_config`, assert structural equality of the
 //! source `Config` and that the rebuilt pipelines match.
 
-use minos_config::{load_active_config, save_config, Config, FilterInstanceCfg, ServiceConfig};
+use minos_config::{
+    load_active_config, new_bus, save_config, Config, FilterInstanceCfg, RuleSet, ServiceConfig,
+};
 use minos_core::{
     BlockResponse, BuildError, Direction, Filter, FilterKind, FilterRegistry, Packet, ProtocolKind,
     ProxyMode, Verdict,
@@ -84,7 +86,7 @@ fn end_to_end_save_load_round_trip() {
     // Phase 1: save through the full save_config path.
     {
         let storage = SqliteStorage::open(&db).unwrap();
-        let (_built, version) = save_config(&storage, &registry, &cfg, Some("first save")).unwrap();
+        let version = save_config(&storage, &registry, &cfg, Some("first save"), None).unwrap();
         assert_eq!(version, 1);
         assert_eq!(storage.active_version().unwrap(), 1);
     }
@@ -117,9 +119,28 @@ fn save_with_unknown_kind_does_not_persist() {
     let registry = FilterRegistry::new();
 
     let storage = SqliteStorage::open(&db).unwrap();
-    let err = save_config(&storage, &registry, &cfg, None).err().unwrap();
+    let err = save_config(&storage, &registry, &cfg, None, None)
+        .err()
+        .unwrap();
     assert!(matches!(err, minos_config::ConfigError::FilterBuild { .. }));
 
     // Active version should still be unset (no row written).
     assert!(storage.active_version().is_err());
+}
+
+#[test]
+fn save_config_with_bus_makes_new_ruleset_live() {
+    let mut registry = FilterRegistry::new();
+    registry.register::<EchoKind>();
+    let storage = minos_storage::InMemoryStorage::new();
+    let initial_cfg = Config::default();
+    let (bus, _rx) = new_bus(RuleSet::empty_for(initial_cfg));
+
+    let next_cfg = sample_config();
+
+    let version = save_config(&storage, &registry, &next_cfg, None, Some(&bus)).expect("save");
+
+    assert_eq!(version, 1);
+    let live = bus.rules.load();
+    assert_eq!(live.services().len(), 1);
 }

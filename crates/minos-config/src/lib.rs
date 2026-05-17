@@ -7,10 +7,12 @@
 #![deny(missing_docs)]
 #![allow(clippy::module_name_repetitions)]
 
+mod bus;
 mod error;
 mod loader;
 mod types;
 
+pub use bus::{new_bus, Bus, LogSink};
 pub use error::ConfigError;
-pub use loader::{load_active_config, save_config, validate, BuiltConfig};
+pub use loader::{load_active_config, save_config, validate, RuleSet};
 pub use types::{Config, FilterInstanceCfg, ServiceConfig};

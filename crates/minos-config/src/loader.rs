@@ -6,20 +6,43 @@ use minos_storage::Storage;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-/// A `Config` whose filters have been built into runnable instances.
-///
-/// Phase 2 will add a higher-level `RuleSet` that owns a `BuiltConfig`
-/// alongside per-service execution state. For Phase 1 this is the bridge
-/// between the on-disk types and the runtime.
+/// The runtime form of a [`Config`]: every `FilterInstance` is built and ready
+/// to dispatch. Held in an `Arc<ArcSwap<RuleSet>>` so the data plane sees
+/// updates atomically without blocking on the control plane.
 #[derive(Debug)]
-pub struct BuiltConfig {
+pub struct RuleSet {
     /// The validated source config.
     pub source: Config,
     /// One built pipeline per service, in the same order as `source.services`.
     pub pipelines: Vec<Vec<FilterInstance>>,
 }
 
-/// Validate a `Config` against the registry. Returns a `BuiltConfig` ready to
+impl RuleSet {
+    /// Construct a `RuleSet` with no built pipelines, suitable as the initial
+    /// value before any config has been loaded. The `source` is retained so
+    /// the control plane can render diff views from version 1 onwards.
+    #[must_use]
+    pub fn empty_for(source: Config) -> Self {
+        let pipelines = source.services.iter().map(|_| Vec::new()).collect();
+        Self { source, pipelines }
+    }
+
+    /// Borrow the list of `ServiceConfig` from the underlying source.
+    #[must_use]
+    pub fn services(&self) -> &[ServiceConfig] {
+        &self.source.services
+    }
+
+    /// Borrow the built pipeline for the service at index `service_idx`. The
+    /// index must match the order of `services()`. Panics if out of bounds —
+    /// the caller is expected to have looked up the index from `services()`.
+    #[must_use]
+    pub fn pipeline_for(&self, service_idx: usize) -> &[FilterInstance] {
+        &self.pipelines[service_idx]
+    }
+}
+
+/// Validate a `Config` against the registry. Returns a `RuleSet` ready to
 /// hand to the data plane, or the first error encountered. Does not perform
 /// any IO.
 ///
@@ -28,7 +51,7 @@ pub struct BuiltConfig {
 /// Returns `ConfigError::Invalid` for structural problems (duplicate service
 /// names, zero `max_body_bytes`, etc.) or `ConfigError::FilterBuild` if any
 /// filter fails to build.
-pub fn validate(cfg: &Config, registry: &FilterRegistry) -> Result<BuiltConfig, ConfigError> {
+pub fn validate(cfg: &Config, registry: &FilterRegistry) -> Result<RuleSet, ConfigError> {
     // Structural invariants.
     let mut seen_names: HashSet<&str> = HashSet::new();
     for s in &cfg.services {
@@ -52,7 +75,7 @@ pub fn validate(cfg: &Config, registry: &FilterRegistry) -> Result<BuiltConfig, 
         pipelines.push(build_service_pipeline(service, registry)?);
     }
 
-    Ok(BuiltConfig {
+    Ok(RuleSet {
         source: cfg.clone(),
         pipelines,
     })
@@ -85,12 +108,12 @@ fn build_service_pipeline(
     Ok(out)
 }
 
-/// Validate, then persist, then mark active. The save flow from spec §6.3
-/// abridged to what Phase 1 exposes: returns the new version number.
+/// Validate, persist, mark active, and (optionally) publish to a [`crate::Bus`].
 ///
-/// Note: the actual `ArcSwap<RuleSet>` swap happens in Phase 2 once the data
-/// plane exists. For now, callers get back the `BuiltConfig` and the new
-/// version, and decide whether to use either.
+/// On success returns the new version number. If a `bus` is provided, the
+/// built [`RuleSet`] is also swapped into it atomically — that's how the
+/// running daemon picks up new configs. Callers that don't need a bus
+/// (CLI, batch tools) pass `None`.
 ///
 /// # Errors
 ///
@@ -102,12 +125,16 @@ pub fn save_config<S: Storage>(
     registry: &FilterRegistry,
     cfg: &Config,
     note: Option<&str>,
-) -> Result<(BuiltConfig, u64), ConfigError> {
+    bus: Option<&crate::Bus>,
+) -> Result<u64, ConfigError> {
     let built = validate(cfg, registry)?;
     let blob = serde_json::to_vec(cfg)?;
     let version = storage.save_version(&blob, note)?;
     storage.set_active_version(version)?;
-    Ok((built, version))
+    if let Some(bus) = bus {
+        bus.swap(built);
+    }
+    Ok(version)
 }
 
 /// Load the currently active config from storage and rebuild it.
@@ -120,7 +147,7 @@ pub fn save_config<S: Storage>(
 pub fn load_active_config<S: Storage>(
     storage: &S,
     registry: &FilterRegistry,
-) -> Result<BuiltConfig, ConfigError> {
+) -> Result<RuleSet, ConfigError> {
     let version = storage.active_version()?;
     let blob = storage.load_version(version)?;
     let cfg: Config = serde_json::from_slice(&blob)?;
