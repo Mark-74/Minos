@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}New filter — {{ name }}{% endblock %}
+{% block content %}
+<h1>New filter</h1>
+<form method="post" action="/services/{{ name }}/filters/new" class="form">
+  <label>Display name <input name="display_name" required></label>
+  <label>Kind
+    <select name="kind">
+      {% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+    </select>
+  </label>
+  <button type="submit">Create</button>
+  <a href="/services/{{ name }}" class="button secondary">Cancel</a>
+</form>
+{% endblock %}

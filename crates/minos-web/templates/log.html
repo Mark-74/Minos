@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Log{% endblock %}
+{% block content %}
+<h1>Block log</h1>
+<form method="get" action="/log" class="filters">
+  <label>Service <input name="service" value="{{ service_filter }}"></label>
+  <label>Kind <input name="kind" value="{{ kind_filter }}"></label>
+  <label>Search <input name="search" value="{{ search_filter }}"></label>
+  <label>Show
+    <select name="dry_run">
+      <option value=""{% if dry_run_filter.is_empty() %} selected{% endif %}>All</option>
+      <option value="true"{% if dry_run_filter == "true" %} selected{% endif %}>Dry-run only</option>
+      <option value="false"{% if dry_run_filter == "false" %} selected{% endif %}>Real blocks only</option>
+    </select>
+  </label>
+  <button>Filter</button>
+  <a href="/log" class="button secondary">Clear</a>
+</form>
+
+{% if entries.is_empty() %}
+<p class="empty">No log entries match.</p>
+{% else %}
+<table class="log">
+  <thead><tr><th>Time</th><th>Service</th><th>Dir</th><th>Kind</th><th></th><th>Reason</th><th>Sample</th></tr></thead>
+  <tbody>
+    {% for e in entries %}
+    <tr>
+      <td><code>{{ e.ts }}</code></td>
+      <td>{{ e.service }}</td>
+      <td>{{ e.direction }}</td>
+      <td><code>{{ e.kind }}</code></td>
+      <td>{% if e.dry_run %}<span class="badge dry">dry</span>{% endif %}</td>
+      <td>{{ e.reason }}</td>
+      <td><code>{{ e.sample_short }}</code></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="hint">Showing latest {{ entries.len() }} entries. WebSocket live stream lands in Phase 4b.</p>
+{% endif %}
+{% endblock %}

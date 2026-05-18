@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ display_name }} — regex{% endblock %}
+{% block content %}
+<h1>{{ display_name }} <small>regex</small></h1>
+<form method="post" action="/services/{{ name }}/filters/{{ id }}" class="form">
+  <label>Display name <input name="display_name" value="{{ display_name }}" required></label>
+  <label>Pattern <input name="pattern" value="{{ pattern }}" required></label>
+  <button type="submit">Save</button>
+  <a href="/services/{{ name }}" class="button secondary">Cancel</a>
+</form>
+{% endblock %}

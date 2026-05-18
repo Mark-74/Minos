@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Services</h1>
+{% if services.is_empty() %}
+<p class="empty">No services configured.</p>
+{% else %}
+<table class="services">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Mode</th>
+      <th>Bind</th>
+      <th>Upstream</th>
+      <th>Proto</th>
+      <th>Filters</th>
+      <th>Blocks (5m)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in services %}
+    <tr>
+      <td><a href="/services/{{ s.name }}">{{ s.name }}</a></td>
+      <td>{{ s.mode }}</td>
+      <td><code>{{ s.bind }}</code></td>
+      <td><code>{{ s.upstream }}</code></td>
+      <td>{{ s.protocol }}</td>
+      <td>{{ s.filter_count }}</td>
+      <td>{{ s.block_count_5m }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ display_name }} — http{% endblock %}
+{% block content %}
+<h1>{{ display_name }} <small>http</small></h1>
+<form method="post" action="/services/{{ name }}/filters/{{ id }}" class="form">
+  <label>Display name <input name="display_name" value="{{ display_name }}" required></label>
+  <label>Methods (comma-separated) <input name="methods" value="{{ methods }}"></label>
+  <label>Path regex <input name="path_regex" value="{{ path_regex }}"></label>
+  <label>Body regex <input name="body_regex" value="{{ body_regex }}"></label>
+  <label>Headers (one per line, <code>Name: regex</code>)
+    <textarea name="headers_text" rows="4">{{ headers_text }}</textarea>
+  </label>
+  <button type="submit">Save</button>
+  <a href="/services/{{ name }}" class="button secondary">Cancel</a>
+</form>
+{% endblock %}

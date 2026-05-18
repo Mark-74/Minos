@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ name }}{% endblock %}
+{% block content %}
+<h1>{{ name }}</h1>
+<dl class="meta">
+  <dt>Mode</dt><dd>{{ mode }}</dd>
+  <dt>Bind</dt><dd><code>{{ bind }}</code></dd>
+  <dt>Upstream</dt><dd><code>{{ upstream }}</code></dd>
+  <dt>Protocol</dt><dd>{{ protocol }}</dd>
+</dl>
+
+{% if is_draft %}
+<div class="draft-banner">
+  <strong>Unsaved changes.</strong>
+  <form method="post" action="/services/{{ name }}/save" class="inline"><button type="submit">Save</button></form>
+  <form method="post" action="/services/{{ name }}/discard" class="inline"><button type="submit">Discard</button></form>
+</div>
+{% endif %}
+
+<h2>Pipeline</h2>
+{% if rows.is_empty() %}
+<p class="empty">No filters in this service yet.</p>
+{% else %}
+<table class="pipeline">
+  <thead>
+    <tr><th>#</th><th>Name</th><th>Kind</th><th>Toggles</th><th>Order</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}{% include "_partial_filter_row.html" %}{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<p><a href="/services/{{ name }}/filters/new" class="button">+ Add filter</a></p>
+{% endblock %}

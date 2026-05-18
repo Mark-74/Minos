@@ -64,9 +64,11 @@ pub fn install(root: &Path, requirements: &[u8]) -> Result<InstallOutcome, Filte
         });
     }
 
-    std::fs::create_dir_all(&path)?;
-    let req_file = path.join("requirements.txt");
-    std::fs::write(&req_file, requirements)?;
+    // Ensure the parent root exists, but let `uv venv` create the venv
+    // directory itself — it refuses to populate a pre-existing target.
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
 
     let mut log = String::new();
 
@@ -84,6 +86,10 @@ pub fn install(root: &Path, requirements: &[u8]) -> Result<InstallOutcome, Filte
     if !out.status.success() {
         return Err(FilterError::UvInstallFailed(log));
     }
+
+    // The venv exists now; stage requirements.txt next to it.
+    let req_file = path.join("requirements.txt");
+    std::fs::write(&req_file, requirements)?;
 
     let py = path.join("bin").join("python");
     let py_str = py.to_str().ok_or_else(|| {

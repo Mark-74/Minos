@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ display_name }} — {{ kind }}{% endblock %}
+{% block content %}
+<h1>{{ display_name }} <small>{{ kind }}</small></h1>
+<form method="post" action="/services/{{ name }}/filters/{{ id }}" class="form">
+  <label>Display name <input name="display_name" value="{{ display_name }}" required></label>
+  <label>Config (JSON)
+    <textarea name="config_json" rows="20" cols="80" class="code">{{ config_json }}</textarea>
+  </label>
+  <button type="submit">Save</button>
+  <a href="/services/{{ name }}" class="button secondary">Cancel</a>
+</form>
+<p class="hint">Schema-driven auto-form lands in Phase 4b. For now, edit the JSON config directly.</p>
+{% endblock %}

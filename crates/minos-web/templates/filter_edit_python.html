@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ display_name }} — python_sidecar{% endblock %}
+{% block content %}
+<h1>{{ display_name }} <small>python_sidecar</small></h1>
+<form method="post" action="/services/{{ name }}/filters/{{ id }}" class="form">
+  <label>Display name <input name="display_name" value="{{ display_name }}" required></label>
+  <label>Script (Python)
+    <textarea name="script" rows="20" cols="80" class="code">{{ script }}</textarea>
+  </label>
+  <label>Requirements (one per line)
+    <textarea name="requirements" rows="4" cols="80">{{ requirements }}</textarea>
+  </label>
+  <label>Per-call timeout (ms) <input type="number" name="timeout_ms" value="{{ timeout_ms }}" min="1" max="60000"></label>
+  <label>Failure mode
+    <select name="fail_mode">
+      <option value="open"{% if !fail_closed %} selected{% endif %}>Fail-open (recommended)</option>
+      <option value="closed"{% if fail_closed %} selected{% endif %}>Fail-closed</option>
+    </select>
+  </label>
+  <button type="submit">Save</button>
+  <a href="/services/{{ name }}" class="button secondary">Cancel</a>
+</form>
+<p class="hint">CodeMirror lands in Phase 4b — for now this is a plain textarea.</p>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+
+{% if let Some(msg) = ok %}<p class="success">Saved ({{ msg }}).</p>{% endif %}
+{% if let Some(msg) = error %}<p class="error">{{ msg }}</p>{% endif %}
+
+<section>
+  <h2>Change password</h2>
+  <form method="post" action="/settings/password" class="form">
+    <label>Current <input type="password" name="current" required></label>
+    <label>New <input type="password" name="new" required></label>
+    <label>Confirm new <input type="password" name="confirm" required></label>
+    <button type="submit">Change password</button>
+  </form>
+</section>
+
+<section>
+  <h2>Default block response</h2>
+  <form method="post" action="/settings/defaults" class="form">
+    <label>Status code <input type="number" name="status" min="100" max="599" value="{{ status }}"></label>
+    <label>Body <textarea name="body" rows="4">{{ body }}</textarea></label>
+    <label>Headers (one per line, <code>Name: value</code>)
+      <textarea name="headers_text" rows="3">{{ headers_text }}</textarea>
+    </label>
+    <button type="submit">Save defaults</button>
+  </form>
+</section>
+{% endblock %}

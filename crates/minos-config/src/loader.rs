@@ -120,8 +120,8 @@ fn build_service_pipeline(
 /// Returns the same errors as [`validate`], or `ConfigError::Storage` for IO
 /// failures during the save/set-active steps. If validation fails, no version
 /// row is written.
-pub fn save_config<S: Storage>(
-    storage: &S,
+pub fn save_config(
+    storage: &dyn Storage,
     registry: &FilterRegistry,
     cfg: &Config,
     note: Option<&str>,
@@ -144,8 +144,8 @@ pub fn save_config<S: Storage>(
 /// Returns `ConfigError::Storage` (e.g. `NotFound` if no active version is
 /// set), `ConfigError::Malformed` if the stored blob can't be deserialized,
 /// or any error from [`validate`].
-pub fn load_active_config<S: Storage>(
-    storage: &S,
+pub fn load_active_config(
+    storage: &dyn Storage,
     registry: &FilterRegistry,
 ) -> Result<RuleSet, ConfigError> {
     let version = storage.active_version()?;

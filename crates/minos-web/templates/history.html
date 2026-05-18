@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+{% block content %}
+<h1>Config versions</h1>
+{% if rows.is_empty() %}
+<p class="empty">No saved versions yet.</p>
+{% else %}
+<table class="history">
+  <thead><tr><th>Version</th><th>Created</th><th>Note</th><th></th></tr></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr{% if r.is_active %} class="active"{% endif %}>
+      <td>v{{ r.version }}{% if r.is_active %} <span class="badge on">active</span>{% endif %}</td>
+      <td><code>{{ r.created_at_secs }}</code></td>
+      <td>{{ r.note }}</td>
+      <td>
+        {% if !r.is_active %}
+        <form method="post" action="/history/{{ r.version }}/rollback" class="inline">
+          <button>Rollback</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

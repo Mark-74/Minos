@@ -1,0 +1,20 @@
+<tr>
+  <td>{{ r.idx + 1 }}</td>
+  <td><a href="/services/{{ name }}/filters/{{ r.id }}">{{ r.display_name }}</a></td>
+  <td><code>{{ r.kind }}</code></td>
+  <td class="toggles">
+    <span class="badge{% if r.enabled %} on{% endif %}">on</span>
+    <span class="badge{% if r.dry_run %} dry{% endif %}">dry-run</span>
+    <span class="badge{% if r.on_inbound %} in{% endif %}">in</span>
+    <span class="badge{% if r.on_outbound %} out{% endif %}">out</span>
+  </td>
+  <td>
+    {% if r.idx > 0 %}<form method="post" action="/services/{{ name }}/filters/{{ r.id }}/up" class="inline"><button>↑</button></form>{% endif %}
+    {% if r.idx < r.last_idx %}<form method="post" action="/services/{{ name }}/filters/{{ r.id }}/down" class="inline"><button>↓</button></form>{% endif %}
+  </td>
+  <td>
+    <form method="post" action="/services/{{ name }}/filters/{{ r.id }}/delete" class="inline">
+      <button class="danger">Delete</button>
+    </form>
+  </td>
+</tr>
