@@ -14,7 +14,7 @@ members = [
 edition = "2021"
 rust-version = "1.78"
 license = "MIT"
-repository = "https://github.com/balduccimarco/minos"
+repository = "https://github.com/Mark-74/Minos"
 
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }

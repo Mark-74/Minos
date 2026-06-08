@@ -40,7 +40,7 @@ Caronte — keep capturing pcaps as usual.
 The fastest path. You need Docker with Compose.
 
 ```bash
-git clone <your-fork-url> minos
+git clone https://github.com/Mark-74/Minos.git minos
 cd minos
 docker compose up --build
 ```
