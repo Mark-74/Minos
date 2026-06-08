@@ -5,6 +5,9 @@ in, adding a service, saving a filter, and watching the block log. It
 assumes the Minos binary is running and the web UI is reachable at the
 configured address (default `http://127.0.0.1:8080`).
 
+To get Minos *running* in the first place (Docker, the binary, env vars,
+reverse-proxy and transparent wiring), see [install.md](install.md).
+
 ## 1. First-run login
 
 Open the UI in a browser. You'll land on `/login`. The first POST to
@@ -25,8 +28,11 @@ After login you land on `/`. The dashboard lists every configured service
 the last 5 minutes). Click a service name to open its detail page.
 
 If you've just deployed Minos for the first time, this page will be empty
-— Minos doesn't ship with services pre-configured. The Phase 5 binary
-will load services from a YAML config or environment variables on startup.
+— Minos doesn't ship with services pre-configured. The binary bootstraps
+an empty config on first run; add your first service here (see
+[install.md](install.md) for how the bind/upstream map to your network).
+Listeners bind at startup, so **adding or removing a service needs a
+restart**; filter and rule edits hot-reload live.
 
 ## 3. Service detail
 

@@ -1,0 +1,16 @@
+# Build artifacts and VCS — never needed in the image build context.
+target/
+.git/
+.gitignore
+
+# Local databases / state.
+*.db
+*.db-*
+data/
+
+# Editor / OS cruft and local session markers.
+.vscode/
+.idea/
+*.swp
+.DS_Store
+bruh.sh

@@ -1,0 +1,35 @@
+[package]
+name = "minos"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Minos: a modular firewall for Attack/Defense CTFs — runnable binary."
+default-run = "minos"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "minos"
+path = "src/main.rs"
+
+[dependencies]
+minos-core = { path = "../minos-core" }
+minos-config = { path = "../minos-config" }
+minos-storage = { path = "../minos-storage" }
+minos-filters = { path = "../minos-filters" }
+minos-proxy = { path = "../minos-proxy" }
+minos-web = { path = "../minos-web" }
+
+tokio = { workspace = true }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+axum-extra.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
