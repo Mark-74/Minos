@@ -28,10 +28,10 @@ After login you land on `/`. The dashboard lists every configured service
 the last 5 minutes). Click a service name to open its detail page.
 
 If you've just deployed Minos for the first time, this page will be empty
-— Minos doesn't ship with services pre-configured. The binary bootstraps
-an empty config on first run; add your first service here (see
-[install.md](install.md) for how the bind/upstream map to your network).
-Listeners bind at startup, so **adding or removing a service needs a
+unless you seeded services via a `MINOS_CONFIG` file at startup — the web
+UI manages filters *within* services, but the service list comes from that
+file (see [install.md](install.md#declaring-services)). Listeners bind at
+startup, so **adding or removing a service needs a config-file edit and a
 restart**; filter and rule edits hot-reload live.
 
 ## 3. Service detail

@@ -1,0 +1,26 @@
+{
+  "services": [
+    {
+      "name": "web",
+      "mode": {
+        "kind": "reverse",
+        "bind": "0.0.0.0:9000",
+        "upstream": "127.0.0.1:5000"
+      },
+      "protocol": "http",
+      "max_body_bytes": 65536,
+      "pipeline": [
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "display_name": "block obvious sqli (dry-run)",
+          "kind": "regex",
+          "config": { "pattern": "(?i)union\\s+select" },
+          "enabled": true,
+          "dry_run": true,
+          "on_inbound": true,
+          "on_outbound": false
+        }
+      ]
+    }
+  ]
+}

@@ -17,9 +17,14 @@ services:
       MINOS_VENV_ROOT: /data/venvs
       MINOS_SOCKET_DIR: /run/minos/sidecars
       RUST_LOG: info
+      # To seed services on first run, copy examples/config.example.json to
+      # ./config.json, then uncomment this and the matching volume below.
+      # MINOS_CONFIG: /config.json
     volumes:
       # Persist the config history (SQLite) and the deduped sidecar venvs.
       - minos-data:/data
+      # Service definitions, seeded on first run (see MINOS_CONFIG above):
+      # - ./config.json:/config.json:ro
     # Transparent mode (iptables REDIRECT + SO_ORIGINAL_DST) needs NET_ADMIN.
     # Harmless for reverse-proxy-only deployments. For transparent mode you
     # will typically also want `network_mode: host` instead of `ports:`.

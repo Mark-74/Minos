@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use axum_extra::extract::cookie::Key;
-use minos_config::{load_active_config, new_bus, save_config, validate, Config};
+use minos_config::{load_active_config, new_bus, save_config, Config, RuleSet};
 use minos_core::FilterRegistry;
 use minos_filters::register_builtin_filters;
 use minos_proxy::{listen_service, spawn_log_writer};
@@ -29,6 +29,12 @@ pub struct AppConfig {
     pub db_path: String,
     /// Web UI bind address (`MINOS_WEB_BIND`, default `0.0.0.0:8080`).
     pub web_bind: String,
+    /// Optional path to a JSON config used to **seed services on first run**
+    /// (`MINOS_CONFIG`). The web UI can create filters but not services, so
+    /// this file is how an operator declares the services to defend. It is
+    /// applied only when the database has no active config yet; thereafter the
+    /// database (and the UI's edit/rollback history) is authoritative.
+    pub config_path: Option<String>,
 }
 
 impl AppConfig {
@@ -38,8 +44,45 @@ impl AppConfig {
         Self {
             db_path: std::env::var("MINOS_DB").unwrap_or_else(|_| "minos.db".into()),
             web_bind: std::env::var("MINOS_WEB_BIND").unwrap_or_else(|_| "0.0.0.0:8080".into()),
+            config_path: std::env::var("MINOS_CONFIG").ok().filter(|s| !s.is_empty()),
         }
     }
+}
+
+/// Resolve the initial [`RuleSet`]: use the active config from storage if one
+/// exists; otherwise seed from `config_path` (a JSON [`Config`]) when given, or
+/// fall back to an empty config. The seeded/bootstrapped config is saved as the
+/// first version so it appears in history and the UI has something to edit.
+///
+/// # Errors
+///
+/// Returns an error if the seed file can't be read or parsed, or if saving /
+/// validating the resulting config fails.
+fn load_or_seed(
+    storage: &dyn Storage,
+    registry: &FilterRegistry,
+    config_path: Option<&str>,
+) -> anyhow::Result<RuleSet> {
+    if let Ok(rs) = load_active_config(storage, registry) {
+        return Ok(rs);
+    }
+
+    let (cfg, note) = if let Some(path) = config_path {
+        tracing::info!(path, "seeding initial config from file");
+        let bytes = std::fs::read(path).with_context(|| format!("reading seed config {path}"))?;
+        let cfg: Config = serde_json::from_slice(&bytes)
+            .with_context(|| format!("parsing seed config {path} as JSON"))?;
+        (cfg, "seed from MINOS_CONFIG")
+    } else {
+        tracing::warn!("no active config and no MINOS_CONFIG; bootstrapping an empty one");
+        (Config::default(), "bootstrap")
+    };
+
+    // save_config validates the config (regex compiles, scripts parse, venvs
+    // install) before persisting; on success it returns the new version and we
+    // re-read it as a built RuleSet.
+    save_config(storage, registry, &cfg, Some(note), None).context("saving initial config")?;
+    load_active_config(storage, registry).context("loading the freshly saved config")
 }
 
 /// Assemble and run Minos until the web server stops (or, with the signal
@@ -58,18 +101,8 @@ pub async fn run(cfg: AppConfig) -> anyhow::Result<()> {
     let mut registry = FilterRegistry::new();
     register_builtin_filters(&mut registry);
 
-    // Load the active config; bootstrap an empty one on first run so the UI
-    // has a version to edit.
-    let ruleset = match load_active_config(storage.as_ref(), &registry) {
-        Ok(rs) => rs,
-        Err(e) => {
-            tracing::warn!(error = %e, "no active config found; bootstrapping an empty one");
-            let empty = Config::default();
-            save_config(storage.as_ref(), &registry, &empty, Some("bootstrap"), None)
-                .context("saving bootstrap config")?;
-            validate(&empty, &registry).context("validating bootstrap config")?
-        }
-    };
+    // Load the active config, seeding from MINOS_CONFIG (or empty) on first run.
+    let ruleset = load_or_seed(storage.as_ref(), &registry, cfg.config_path.as_deref())?;
 
     // Services to bind listeners for (captured before the ruleset moves).
     let services = ruleset.source.services.clone();
@@ -112,4 +145,83 @@ pub async fn run(cfg: AppConfig) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use minos_core::{ProtocolKind, ProxyMode};
+    use minos_storage::InMemoryStorage;
+
+    fn registry() -> FilterRegistry {
+        let mut r = FilterRegistry::new();
+        register_builtin_filters(&mut r);
+        r
+    }
+
+    fn one_service_config() -> Config {
+        Config {
+            services: vec![minos_config::ServiceConfig {
+                name: "web".into(),
+                mode: ProxyMode::Reverse {
+                    bind: "127.0.0.1:9000".parse().unwrap(),
+                    upstream: "127.0.0.1:5000".parse().unwrap(),
+                },
+                protocol: ProtocolKind::Http,
+                pipeline: vec![],
+                block_response_override: None,
+                max_body_bytes: 1024,
+            }],
+            ..Config::default()
+        }
+    }
+
+    #[test]
+    fn seeds_services_from_file_on_first_run() {
+        let storage = InMemoryStorage::new();
+        let reg = registry();
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(&file, serde_json::to_vec(&one_service_config()).unwrap()).unwrap();
+
+        let rs = load_or_seed(&storage, &reg, file.path().to_str()).unwrap();
+        assert_eq!(rs.source.services.len(), 1);
+        assert_eq!(rs.source.services[0].name, "web");
+        // Persisted as the first version.
+        assert_eq!(storage.active_version().unwrap(), 1);
+    }
+
+    #[test]
+    fn bootstraps_empty_without_seed_file() {
+        let storage = InMemoryStorage::new();
+        let reg = registry();
+        let rs = load_or_seed(&storage, &reg, None).unwrap();
+        assert!(rs.source.services.is_empty());
+    }
+
+    #[test]
+    fn does_not_reseed_when_active_config_exists() {
+        let storage = InMemoryStorage::new();
+        let reg = registry();
+        // First run seeds one service.
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(&file, serde_json::to_vec(&one_service_config()).unwrap()).unwrap();
+        load_or_seed(&storage, &reg, file.path().to_str()).unwrap();
+
+        // Second run with no seed path keeps the existing config.
+        let rs = load_or_seed(&storage, &reg, None).unwrap();
+        assert_eq!(rs.source.services.len(), 1);
+        assert_eq!(
+            storage.active_version().unwrap(),
+            1,
+            "no new version written"
+        );
+    }
+
+    #[test]
+    fn errors_on_missing_seed_file() {
+        let storage = InMemoryStorage::new();
+        let reg = registry();
+        let err = load_or_seed(&storage, &reg, Some("/no/such/file.json")).unwrap_err();
+        assert!(err.to_string().contains("reading seed config"));
+    }
 }
