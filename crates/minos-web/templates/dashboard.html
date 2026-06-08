@@ -32,4 +32,22 @@
   </tbody>
 </table>
 {% endif %}
+
+<h2>Recent blocks</h2>
+<p class="hint" id="recent-empty"{% if !recent.is_empty() %} hidden{% endif %}>No blocks recorded yet. Live matches appear here.</p>
+<table class="log" id="recent-table"{% if recent.is_empty() %} hidden{% endif %}>
+  <thead><tr><th>Time</th><th>Service</th><th>Kind</th><th>Reason</th><th>Sample</th></tr></thead>
+  <tbody id="recent-tbody">
+    {% for e in recent %}
+    <tr>
+      <td><code>{{ e.ts }}</code></td>
+      <td>{{ e.service }}</td>
+      <td><code>{{ e.kind }}</code></td>
+      <td>{{ e.reason }}</td>
+      <td><code>{{ e.sample_short }}</code></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<script src="/assets/dashboard_blocks.js" defer></script>
 {% endblock %}

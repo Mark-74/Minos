@@ -4,11 +4,15 @@
 <h1>{{ display_name }} <small>{{ kind }}</small></h1>
 <form method="post" action="/services/{{ name }}/filters/{{ id }}" class="form">
   <label>Display name <input name="display_name" value="{{ display_name }}" required></label>
+  {% if has_schema %}
+  {{ form_html|safe }}
+  {% else %}
   <label>Config (JSON)
     <textarea name="config_json" rows="20" cols="80" class="code">{{ config_json }}</textarea>
   </label>
+  <p class="hint">No schema registered for this kind; edit the JSON config directly.</p>
+  {% endif %}
   <button type="submit">Save</button>
   <a href="/services/{{ name }}" class="button secondary">Cancel</a>
 </form>
-<p class="hint">Schema-driven auto-form lands in Phase 4b. For now, edit the JSON config directly.</p>
 {% endblock %}

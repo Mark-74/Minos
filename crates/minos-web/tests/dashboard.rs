@@ -30,7 +30,13 @@ fn state_with_one_service() -> AppState {
     let (bus, _rx) = new_bus(RuleSet::empty_for(cfg));
     let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
     let registry = Arc::new(FilterRegistry::new());
-    AppState::new(bus, storage, registry, Key::generate())
+    AppState::new(
+        bus,
+        storage,
+        registry,
+        Key::generate(),
+        Arc::new(tokio::sync::broadcast::channel(16).0),
+    )
 }
 
 async fn login_cookie(app: &axum::Router) -> String {

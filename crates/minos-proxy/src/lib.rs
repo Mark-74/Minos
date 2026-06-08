@@ -50,3 +50,9 @@ pub use listener::listen_service;
 
 mod log_writer;
 pub use log_writer::spawn_log_writer;
+
+/// Broadcast sender used to fan log entries out to live subscribers (the web
+/// UI's WebSocket handlers). The log-writer task is the producer; each
+/// subscriber gets its own receiver via
+/// [`tokio::sync::broadcast::Sender::subscribe`].
+pub type LogBroadcast = tokio::sync::broadcast::Sender<minos_core::LogEntry>;

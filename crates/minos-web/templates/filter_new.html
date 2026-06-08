@@ -2,13 +2,25 @@
 {% block title %}New filter — {{ name }}{% endblock %}
 {% block content %}
 <h1>New filter</h1>
+{% if !prefill_pattern.is_empty() %}
+<p class="hint">Seeded from a logged match. Review the pattern, then create the rule
+(it starts in dry-run).</p>
+{% endif %}
 <form method="post" action="/services/{{ name }}/filters/new" class="form">
-  <label>Display name <input name="display_name" required></label>
+  <label>Display name
+    <input name="display_name" required
+      value="{% if !prefill_pattern.is_empty() %}from match{% endif %}">
+  </label>
   <label>Kind
     <select name="kind">
-      {% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+      {% for k in kinds %}<option value="{{ k.0 }}"{% if k.1 %} selected{% endif %}>{{ k.0 }}</option>{% endfor %}
     </select>
   </label>
+  {% if !prefill_pattern.is_empty() %}
+  <label>Pattern (regex)
+    <input name="pattern" value="{{ prefill_pattern }}">
+  </label>
+  {% endif %}
   <button type="submit">Create</button>
   <a href="/services/{{ name }}" class="button secondary">Cancel</a>
 </form>

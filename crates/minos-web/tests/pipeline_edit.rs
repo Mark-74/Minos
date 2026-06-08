@@ -26,7 +26,13 @@ fn state_with(services: Vec<ServiceConfig>) -> AppState {
     let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
     let mut registry = FilterRegistry::new();
     register_builtin_filters(&mut registry);
-    AppState::new(bus, storage, Arc::new(registry), Key::generate())
+    AppState::new(
+        bus,
+        storage,
+        Arc::new(registry),
+        Key::generate(),
+        Arc::new(tokio::sync::broadcast::channel(16).0),
+    )
 }
 
 /// Minimal service with an empty pipeline.

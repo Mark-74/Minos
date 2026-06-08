@@ -15,7 +15,13 @@ fn state() -> AppState {
     let (bus, _rx) = new_bus(RuleSet::empty_for(Config::default()));
     let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
     let registry = Arc::new(FilterRegistry::new());
-    AppState::new(bus, storage, registry, Key::generate())
+    AppState::new(
+        bus,
+        storage,
+        registry,
+        Key::generate(),
+        Arc::new(tokio::sync::broadcast::channel(16).0),
+    )
 }
 
 #[tokio::test]

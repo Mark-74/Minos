@@ -75,13 +75,16 @@ Fill in the config. Per-kind editors:
 - **http** — `methods`, `path_regex`, `body_regex`, and a `headers`
   textarea (one `Name: regex` pair per line). All non-empty conditions
   AND together.
-- **python_sidecar** — Script textarea (plain `<textarea>` in Phase 4a;
-  CodeMirror lands in 4b), Requirements textarea, per-call timeout in
-  ms, and a fail-open/fail-closed select. The script must define a
+- **python_sidecar** — Script editor (CodeMirror, Python syntax
+  highlighting), Requirements textarea, per-call timeout in ms, and a
+  fail-open/fail-closed select. The script must define a
   `filter(packet)` function — see `docs/reference/sidecar-protocol.md`
-  for the packet schema.
-- Anything else — generic JSON textarea (the schema-driven auto-form
-  lands in Phase 4b).
+  for the packet schema. When you save a service whose Python filter has
+  new requirements, the `uv pip install` output streams live into a
+  panel so you can watch (or diagnose) the install.
+- Anything else — a form generated automatically from the filter kind's
+  config schema (checkboxes, number/text inputs, nested fieldsets). A
+  kind with no registered schema falls back to a JSON textarea.
 
 After editing, save the filter. The change is in your draft; flip back to
 the service detail page and **Save** to make it live.
@@ -92,8 +95,12 @@ the service detail page and **Save** to make it live.
 Filter by service, kind, dry-run-only, real-only, or substring search;
 the URL updates so you can share it with teammates.
 
-The live WebSocket stream is **Phase 4b**. For now refresh the page
-periodically (or hit a specific time range via `since_ms`).
+New matches stream in live over a WebSocket — no refresh needed — and
+respect whatever filters are in the URL. Each row has a **+ rule** link
+that jumps to the new-filter form pre-seeded with that match as a regex
+pattern (in dry-run), so you can turn an observed attack into a rule in
+one click. The dashboard's **Recent blocks** panel uses the same live
+feed.
 
 ## 6. History and rollback
 
@@ -106,7 +113,8 @@ and make it active. History is a stack of intentional saves — rollback
 doesn't truncate, it appends. To undo a rollback, rollback to the
 version you started from.
 
-Diff view is **Phase 4b**.
+**Diff vs active** on any non-active row opens a side-by-side
+pretty-printed JSON comparison of that version against the active one.
 
 ## 7. Settings
 
@@ -123,18 +131,17 @@ Diff view is **Phase 4b**.
 Click **Logout** in the header. The signed cookie is dropped; you're sent
 back to `/login`.
 
-## What's deferred to Phase 4b
+## What's deferred to Phase 5
 
-- WebSocket-driven live log (server-pushed updates without refresh).
-- CodeMirror script editor for python_sidecar filters (today: plain
-  `<textarea>`).
-- Streaming `uv pip install` progress when a Python filter's
-  requirements change.
-- "Create rule from this match" — one-click rule scaffolding from a log
-  entry.
-- History diff — side-by-side JSON comparison of two versions.
-- Recent-blocks panel on the dashboard.
+The operator UI is feature-complete after Phase 4b. What remains is
+packaging:
+
+- The `minos` binary that wires the data plane (proxy listeners) and the
+  control plane (this web UI) together and starts everything.
+- A `Dockerfile` and `docker-compose.yml` for one-command deployment.
+- Operator install docs: Docker, transparent-mode iptables example, and
+  reverse-proxy upstream wiring.
 
 The data plane itself is fully feature-complete after Phases 1–3, so a
 Minos instance with a saved config of regex / http / python_sidecar
-filters will block traffic in real-time even without the 4b features.
+filters blocks traffic in real time independently of the UI.

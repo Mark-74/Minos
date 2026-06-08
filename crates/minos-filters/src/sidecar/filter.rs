@@ -208,9 +208,7 @@ fn build_python_sidecar(
         fail_closed,
     } = cfg;
 
-    let venv_root = PathBuf::from(
-        std::env::var("MINOS_VENV_ROOT").unwrap_or_else(|_| "/var/lib/minos/venvs".into()),
-    );
+    let venv_root = venv::default_root();
     let socket_dir = PathBuf::from(
         std::env::var("MINOS_SOCKET_DIR").unwrap_or_else(|_| "/run/minos/sidecars".into()),
     );

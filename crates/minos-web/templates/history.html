@@ -18,6 +18,9 @@
         <form method="post" action="/history/{{ r.version }}/rollback" class="inline">
           <button>Rollback</button>
         </form>
+        {% if active_version != 0 %}
+        <a class="button secondary" href="/history/diff?from={{ active_version }}&amp;to={{ r.version }}">Diff vs active</a>
+        {% endif %}
         {% endif %}
       </td>
     </tr>

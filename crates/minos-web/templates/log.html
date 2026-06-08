@@ -17,12 +17,10 @@
   <a href="/log" class="button secondary">Clear</a>
 </form>
 
-{% if entries.is_empty() %}
-<p class="empty">No log entries match.</p>
-{% else %}
-<table class="log">
-  <thead><tr><th>Time</th><th>Service</th><th>Dir</th><th>Kind</th><th></th><th>Reason</th><th>Sample</th></tr></thead>
-  <tbody>
+<p class="hint" id="log-empty"{% if !entries.is_empty() %} hidden{% endif %}>No log entries match yet. Live matches will appear here.</p>
+<table class="log" id="log-table"{% if entries.is_empty() %} hidden{% endif %}>
+  <thead><tr><th>Time</th><th>Service</th><th>Dir</th><th>Kind</th><th></th><th>Reason</th><th>Sample</th><th></th></tr></thead>
+  <tbody id="log-tbody">
     {% for e in entries %}
     <tr>
       <td><code>{{ e.ts }}</code></td>
@@ -32,10 +30,12 @@
       <td>{% if e.dry_run %}<span class="badge dry">dry</span>{% endif %}</td>
       <td>{{ e.reason }}</td>
       <td><code>{{ e.sample_short }}</code></td>
+      <td><a href="/services/{{ e.service }}/filters/new?prefill_kind=regex&amp;prefill_pattern={{ e.sample_short|urlencode }}">+ rule</a></td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
-<p class="hint">Showing latest {{ entries.len() }} entries. WebSocket live stream lands in Phase 4b.</p>
-{% endif %}
+<p class="hint">Live stream connected; new matches are prepended as they arrive.</p>
+<script>window.MINOS_LOG_WS_URL = "/log/ws?{{ ws_qs }}";</script>
+<script src="/assets/log_ws.js" defer></script>
 {% endblock %}

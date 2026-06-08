@@ -23,7 +23,13 @@ fn state_with_entries() -> AppState {
         .append_log(&entry("svc-b", "http", true, "would block"))
         .unwrap();
     let registry = Arc::new(FilterRegistry::new());
-    AppState::new(bus, storage, registry, Key::generate())
+    AppState::new(
+        bus,
+        storage,
+        registry,
+        Key::generate(),
+        Arc::new(tokio::sync::broadcast::channel(16).0),
+    )
 }
 
 fn entry(service: &str, kind: &str, dry_run: bool, reason: &str) -> LogEntry {

@@ -24,6 +24,10 @@ pub struct AppState {
     pub drafts: Arc<DraftStore>,
     /// Cookie-signing key.
     pub cookie_key: Key,
+    /// Broadcast sender for live log subscribers. WebSocket handlers
+    /// subscribe to this; the log-writer task in `minos-proxy` is the
+    /// producer.
+    pub log_broadcast: Arc<minos_proxy::LogBroadcast>,
 }
 
 impl AppState {
@@ -35,6 +39,7 @@ impl AppState {
         storage: Arc<dyn Storage>,
         registry: Arc<FilterRegistry>,
         cookie_key: Key,
+        log_broadcast: Arc<minos_proxy::LogBroadcast>,
     ) -> Self {
         Self {
             bus,
@@ -42,6 +47,7 @@ impl AppState {
             registry,
             drafts: Arc::new(DraftStore::new()),
             cookie_key,
+            log_broadcast,
         }
     }
 }
@@ -63,7 +69,14 @@ mod tests {
         let (bus, _rx) = new_bus(RuleSet::empty_for(Config::default()));
         let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
         let registry = Arc::new(FilterRegistry::new());
-        let state = AppState::new(bus, storage, registry, Key::generate());
+        let (broadcast_tx, _sub) = tokio::sync::broadcast::channel(16);
+        let state = AppState::new(
+            bus,
+            storage,
+            registry,
+            Key::generate(),
+            Arc::new(broadcast_tx),
+        );
         let _ = state.clone();
     }
 }

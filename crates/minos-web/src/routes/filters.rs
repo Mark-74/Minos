@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::hash::BuildHasher;
 
 use askama::Template;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::Form;
@@ -62,11 +62,27 @@ fn render<T: Template>(t: T) -> Response {
 struct NewForm {
     /// Service name (URL segment and display).
     name: String,
-    /// All registered filter kind names, for the dropdown.
-    kinds: Vec<&'static str>,
+    /// Registered filter kinds as `(name, is_selected)` for the dropdown.
+    kinds: Vec<(&'static str, bool)>,
+    /// Pattern to seed a regex filter with (from `prefill_pattern`), or empty.
+    prefill_pattern: String,
 }
 
-/// Render the new-filter form with a dropdown of registered kinds.
+/// Query params for the new-filter form, used by the "create rule from this
+/// match" link on the log page.
+#[derive(Deserialize, Default)]
+pub struct NewQuery {
+    /// Filter kind to pre-select.
+    #[serde(default)]
+    prefill_kind: String,
+    /// Regex pattern to seed (only meaningful when `prefill_kind == "regex"`).
+    #[serde(default)]
+    prefill_pattern: String,
+}
+
+/// Render the new-filter form with a dropdown of registered kinds. When
+/// `prefill_kind` / `prefill_pattern` are present (from the log page's
+/// "+ rule" link), the form is seeded so one submit creates the rule.
 ///
 /// # Errors
 ///
@@ -74,12 +90,21 @@ struct NewForm {
 pub async fn new_get(
     State(state): State<AppState>,
     Path(name): Path<String>,
+    Query(q): Query<NewQuery>,
 ) -> Result<Response, WebError> {
     // Verify the service exists.
     draft_for(&state, &name)?;
-    let mut kinds = state.registry.known_kinds();
-    kinds.sort_unstable();
-    Ok(render(NewForm { name, kinds }))
+    let mut kind_names = state.registry.known_kinds();
+    kind_names.sort_unstable();
+    let kinds: Vec<(&'static str, bool)> = kind_names
+        .into_iter()
+        .map(|k| (k, k == q.prefill_kind.as_str()))
+        .collect();
+    Ok(render(NewForm {
+        name,
+        kinds,
+        prefill_pattern: q.prefill_pattern,
+    }))
 }
 
 // ---------------------------------------------------------------------------
@@ -93,10 +118,18 @@ pub struct NewFilterForm {
     kind: String,
     /// Operator-supplied display name.
     display_name: String,
+    /// Optional seed pattern (from the "create rule from match" flow). Only
+    /// applied for the `regex` kind.
+    #[serde(default)]
+    pattern: String,
 }
 
-/// Create a new filter instance in the draft pipeline and redirect to its
-/// editor.
+/// Create a new filter instance in the draft pipeline.
+///
+/// Normally redirects to the kind-specific editor with an empty config. When
+/// `pattern` is supplied for a `regex` filter (the "create rule from match"
+/// flow), the config is seeded immediately and we redirect straight to the
+/// service detail page so a single submit lands a working draft rule.
 ///
 /// # Errors
 ///
@@ -113,20 +146,31 @@ pub async fn new_post(
     if !state.registry.known_kinds().contains(&form.kind.as_str()) {
         return Err(WebError::BadRequest(format!("unknown kind {}", form.kind)));
     }
+    let seed_regex = form.kind == "regex" && !form.pattern.is_empty();
+    let config = if seed_regex {
+        serde_json::json!({ "pattern": form.pattern })
+    } else {
+        serde_json::json!({})
+    };
     let mut draft = draft_for(&state, &name)?;
     let id = Uuid::new_v4();
     draft.pipeline.push(FilterInstanceCfg {
         id,
         display_name: form.display_name,
         kind: form.kind,
-        config: serde_json::json!({}),
+        config,
         enabled: true,
         dry_run: true,
         on_inbound: true,
         on_outbound: false,
     });
     state.drafts.put(&name, draft);
-    Ok(redirect_to(&format!("/services/{name}/filters/{id}")))
+    // Seeded rules go straight back to the service; otherwise into the editor.
+    if seed_regex {
+        Ok(redirect_to(&format!("/services/{name}")))
+    } else {
+        Ok(redirect_to(&format!("/services/{name}/filters/{id}")))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +231,7 @@ struct PythonEdit {
     fail_closed: bool,
 }
 
-/// Askama template context for the generic JSON-textarea editor.
+/// Askama template context for the schema-driven generic editor.
 #[derive(Template)]
 #[template(path = "filter_edit_generic.html")]
 struct GenericEdit {
@@ -199,8 +243,12 @@ struct GenericEdit {
     kind: String,
     /// Operator-supplied display name.
     display_name: String,
-    /// Current config as pretty-printed JSON.
+    /// Schema-rendered form fields (HTML), or empty if no schema is known.
+    form_html: String,
+    /// Current config as pretty-printed JSON (fallback when no schema).
     config_json: String,
+    /// Whether a schema-driven form is available.
+    has_schema: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +284,10 @@ pub async fn edit_get(
         "regex" => render_regex_edit(name, id, f),
         "http" => render_http_edit(name, id, f),
         "python_sidecar" => render_python_edit(name, id, f),
-        other => render_generic_edit(name, id, other, f),
+        other => {
+            let schema = state.registry.schema(other).map(|s| s.as_value().clone());
+            render_generic_edit(name, id, other, f, schema.as_ref())
+        }
     })
 }
 
@@ -342,14 +393,21 @@ fn render_generic_edit(
     id: String,
     kind: &str,
     f: &minos_config::FilterInstanceCfg,
+    schema: Option<&serde_json::Value>,
 ) -> Response {
     let config_json = serde_json::to_string_pretty(&f.config).unwrap_or_else(|_| "{}".into());
+    let (form_html, has_schema) = match schema {
+        Some(s) => (crate::auto_form::render_form(s, &f.config), true),
+        None => (String::new(), false),
+    };
     render(GenericEdit {
         name,
         id,
         kind: kind.to_string(),
         display_name: f.display_name.clone(),
+        form_html,
         config_json,
+        has_schema,
     })
 }
 
@@ -526,12 +584,27 @@ fn handle_generic_post<S: BuildHasher>(
     if display_name.trim().is_empty() {
         return Err(WebError::BadRequest("display_name required".into()));
     }
-    let config_json = form
-        .get("config_json")
-        .cloned()
-        .unwrap_or_else(|| "{}".into());
-    let config: serde_json::Value = serde_json::from_str(&config_json)
-        .map_err(|e| WebError::BadRequest(format!("invalid JSON config: {e}")))?;
+
+    // Determine the kind so we can prefer the schema-driven form. Falls back
+    // to a raw JSON textarea for kinds with no registered schema.
+    let kind = {
+        let svc = draft_for(state, name)?;
+        svc.pipeline
+            .iter()
+            .find(|f| f.id == id)
+            .map(|f| f.kind.clone())
+            .ok_or_else(|| WebError::NotFound(format!("filter {id}")))?
+    };
+    let config: serde_json::Value = if let Some(s) = state.registry.schema(&kind) {
+        crate::auto_form::form_to_config(s.as_value(), form)
+    } else {
+        let config_json = form
+            .get("config_json")
+            .cloned()
+            .unwrap_or_else(|| "{}".into());
+        serde_json::from_str(&config_json)
+            .map_err(|e| WebError::BadRequest(format!("invalid JSON config: {e}")))?
+    };
 
     let mut draft = draft_for(state, name)?;
     let f = draft

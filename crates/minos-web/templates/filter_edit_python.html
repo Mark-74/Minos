@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ display_name }} — python_sidecar{% endblock %}
 {% block content %}
+<link rel="stylesheet" href="/assets/codemirror/codemirror.css">
 <h1>{{ display_name }} <small>python_sidecar</small></h1>
 <form method="post" action="/services/{{ name }}/filters/{{ id }}" class="form">
   <label>Display name <input name="display_name" value="{{ display_name }}" required></label>
   <label>Script (Python)
-    <textarea name="script" rows="20" cols="80" class="code">{{ script }}</textarea>
+    <textarea name="script" id="python-script" rows="20" cols="80" class="code">{{ script }}</textarea>
   </label>
   <label>Requirements (one per line)
     <textarea name="requirements" rows="4" cols="80">{{ requirements }}</textarea>
@@ -20,5 +21,19 @@
   <button type="submit">Save</button>
   <a href="/services/{{ name }}" class="button secondary">Cancel</a>
 </form>
-<p class="hint">CodeMirror lands in Phase 4b — for now this is a plain textarea.</p>
+<script src="/assets/codemirror/codemirror.js" defer></script>
+<script src="/assets/codemirror/python.js" defer></script>
+<script>
+window.addEventListener("load", () => {
+  const ta = document.getElementById("python-script");
+  if (!ta || !window.CodeMirror) return;
+  // fromTextArea keeps the underlying <textarea> in sync on form submit,
+  // so no extra wiring is needed for the POST to carry the edited script.
+  window.CodeMirror.fromTextArea(ta, {
+    mode: "python",
+    lineNumbers: true,
+    indentUnit: 4,
+  });
+});
+</script>
 {% endblock %}

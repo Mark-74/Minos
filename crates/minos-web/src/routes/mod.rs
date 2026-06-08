@@ -12,6 +12,7 @@ pub mod filters;
 pub mod history;
 pub mod log;
 pub mod login;
+pub mod save_progress;
 pub mod services;
 pub mod settings;
 
@@ -48,10 +49,13 @@ pub fn router(state: AppState) -> Router {
             post(services::toggle),
         )
         .route("/services/{name}/save", post(services::save))
+        .route("/services/{name}/save-progress", get(save_progress::ws))
         .route("/services/{name}/discard", post(services::discard))
         .route("/history", get(history::get))
+        .route("/history/diff", get(history::diff))
         .route("/history/{version}/rollback", post(history::rollback))
         .route("/log", get(log::get))
+        .route("/log/ws", get(log::ws_get))
         .route("/settings", get(settings::get))
         .route("/settings/password", post(settings::password))
         .route("/settings/defaults", post(settings::defaults))

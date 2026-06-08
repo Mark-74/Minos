@@ -25,6 +25,7 @@
 
 mod assets;
 pub mod auth;
+mod auto_form;
 mod draft;
 mod error;
 pub mod routes;

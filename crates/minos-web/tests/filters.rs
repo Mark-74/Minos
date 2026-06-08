@@ -28,7 +28,13 @@ fn state_with(services: Vec<ServiceConfig>) -> AppState {
     let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
     let mut registry = FilterRegistry::new();
     register_builtin_filters(&mut registry);
-    AppState::new(bus, storage, Arc::new(registry), Key::generate())
+    AppState::new(
+        bus,
+        storage,
+        Arc::new(registry),
+        Key::generate(),
+        Arc::new(tokio::sync::broadcast::channel(16).0),
+    )
 }
 
 fn svc(name: &str) -> ServiceConfig {
@@ -158,6 +164,61 @@ async fn new_post_adds_filter_to_draft_and_redirects() {
         loc.starts_with("/services/svc/filters/"),
         "redirect should point to the filter editor, got: {loc}"
     );
+}
+
+#[tokio::test]
+async fn new_get_prefills_pattern_from_query() {
+    let app = router(state_with(vec![svc("svc")]));
+    let cookie = login_cookie(&app).await;
+    let res = app
+        .oneshot(
+            Request::builder()
+                .uri("/services/svc/filters/new?prefill_kind=regex&prefill_pattern=DROP%20TABLE")
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = body_str(res).await;
+    assert!(body.contains("DROP TABLE"), "pattern should be seeded");
+    assert!(body.contains("name=\"pattern\""), "pattern input present");
+}
+
+#[tokio::test]
+async fn new_post_with_pattern_seeds_regex_and_redirects_to_service() {
+    let state = state_with(vec![svc("svc")]);
+    let app = router(state.clone());
+    let cookie = login_cookie(&app).await;
+    let res = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/services/svc/filters/new")
+                .header(header::COOKIE, cookie)
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "kind=regex&display_name=from+match&pattern=evil",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::SEE_OTHER);
+
+    let draft = state.drafts.get("svc").expect("draft should exist");
+    assert_eq!(draft.pipeline.len(), 1);
+    assert_eq!(draft.pipeline[0].config["pattern"], "evil");
+
+    // Seeded rules redirect straight to the service, skipping the editor.
+    let loc = res
+        .headers()
+        .get(header::LOCATION)
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert_eq!(loc, "/services/svc");
 }
 
 #[tokio::test]

@@ -1,4 +1,4 @@
-//! History route: list versions and rollback.
+//! `/history/diff` side-by-side comparison route.
 
 use std::sync::Arc;
 
@@ -13,22 +13,9 @@ use minos_storage::{InMemoryStorage, Storage};
 use minos_web::{routes::router, AppState};
 use tower::ServiceExt;
 
-fn state_with_versions() -> AppState {
-    let (bus, _rx) = new_bus(RuleSet::empty_for(Config::default()));
-    let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
-    let mut registry = FilterRegistry::new();
-    register_builtin_filters(&mut registry);
-    let registry = Arc::new(registry);
-    let state = AppState::new(
-        bus.clone(),
-        storage.clone(),
-        registry.clone(),
-        Key::generate(),
-        Arc::new(tokio::sync::broadcast::channel(16).0),
-    );
-
-    let svc = ServiceConfig {
-        name: "svc".into(),
+fn svc(name: &str) -> ServiceConfig {
+    ServiceConfig {
+        name: name.into(),
         mode: ProxyMode::Reverse {
             bind: "127.0.0.1:8080".parse().unwrap(),
             upstream: "127.0.0.1:5000".parse().unwrap(),
@@ -37,20 +24,36 @@ fn state_with_versions() -> AppState {
         pipeline: vec![],
         block_response_override: None,
         max_body_bytes: 1024,
-    };
-    let cfg = Config {
-        services: vec![svc],
+    }
+}
+
+/// State with two saved versions: v1 has service "alpha", v2 adds "beta".
+fn state_with_two_versions() -> AppState {
+    let v1 = Config {
+        services: vec![svc("alpha")],
         ..Config::default()
     };
-    save_config(
-        storage.as_ref(),
-        &registry,
-        &cfg,
-        Some("initial"),
-        Some(&bus),
+    let (bus, _rx) = new_bus(RuleSet::empty_for(v1.clone()));
+    let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
+    let mut registry = FilterRegistry::new();
+    register_builtin_filters(&mut registry);
+    let registry = Arc::new(registry);
+    save_config(storage.as_ref(), &registry, &v1, Some("v1"), Some(&bus)).unwrap();
+
+    let v2 = Config {
+        services: vec![svc("alpha"), svc("beta")],
+        ..Config::default()
+    };
+    save_config(storage.as_ref(), &registry, &v2, Some("v2"), Some(&bus)).unwrap();
+
+    let (broadcast_tx, _sub) = tokio::sync::broadcast::channel(16);
+    AppState::new(
+        bus,
+        storage,
+        registry,
+        Key::generate(),
+        Arc::new(broadcast_tx),
     )
-    .unwrap();
-    state
 }
 
 async fn login_cookie(app: &axum::Router) -> String {
@@ -78,14 +81,13 @@ async fn login_cookie(app: &axum::Router) -> String {
 }
 
 #[tokio::test]
-async fn history_lists_versions() {
-    let state = state_with_versions();
-    let app = router(state);
+async fn diff_renders_two_versions_side_by_side() {
+    let app = router(state_with_two_versions());
     let cookie = login_cookie(&app).await;
     let res = app
         .oneshot(
             Request::builder()
-                .uri("/history")
+                .uri("/history/diff?from=1&to=2")
                 .header(header::COOKIE, cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -95,42 +97,25 @@ async fn history_lists_versions() {
     assert_eq!(res.status(), StatusCode::OK);
     let body = res.into_body().collect().await.unwrap().to_bytes();
     let s = std::str::from_utf8(&body).unwrap();
-    assert!(s.contains("v1"), "expected 'v1' in body");
-    assert!(s.contains("initial"), "expected note 'initial' in body");
+    // Both versions' service names appear; only v2 has "beta".
+    assert!(s.contains("alpha"), "v1/v2 both contain alpha");
+    assert!(s.contains("beta"), "v2 contains beta");
+    assert!(s.contains("v1") && s.contains("v2"), "headers present");
 }
 
 #[tokio::test]
-async fn rollback_creates_new_version_pointing_to_same_blob() {
-    let state = state_with_versions();
-    let storage_handle = state.storage.clone();
-    let app = router(state);
+async fn diff_rejects_missing_params() {
+    let app = router(state_with_two_versions());
     let cookie = login_cookie(&app).await;
-
-    // Initially: 1 version.
-    assert_eq!(storage_handle.list_versions().unwrap().len(), 1);
-
     let res = app
         .oneshot(
             Request::builder()
-                .method("POST")
-                .uri("/history/1/rollback")
+                .uri("/history/diff?from=1")
                 .header(header::COOKIE, cookie)
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(res.status(), StatusCode::SEE_OTHER);
-
-    // After rollback: 2 versions (rollback created a new one).
-    let versions = storage_handle.list_versions().unwrap();
-    assert_eq!(versions.len(), 2);
-    assert!(
-        versions[0]
-            .note
-            .as_deref()
-            .unwrap_or("")
-            .contains("rollback to v1"),
-        "expected rollback note on newest version"
-    );
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }

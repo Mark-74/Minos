@@ -12,9 +12,14 @@
 {% if is_draft %}
 <div class="draft-banner">
   <strong>Unsaved changes.</strong>
-  <form method="post" action="/services/{{ name }}/save" class="inline"><button type="submit">Save</button></form>
+  <form method="post" action="/services/{{ name }}/save" class="inline" id="save-form" data-service="{{ name }}"><button type="submit">Save</button></form>
   <form method="post" action="/services/{{ name }}/discard" class="inline"><button type="submit">Discard</button></form>
 </div>
+<div id="save-progress" hidden>
+  <h3>Saving…</h3>
+  <pre id="save-log" class="install-log"></pre>
+</div>
+<script src="/assets/save_progress.js" defer></script>
 {% endif %}
 
 <h2>Pipeline</h2>

@@ -26,12 +26,31 @@ struct ServiceRow {
     block_count_5m: usize,
 }
 
+/// One row in the "recent blocks" panel.
+struct RecentRow {
+    /// Unix milliseconds of the decision.
+    ts: i64,
+    /// Service name.
+    service: String,
+    /// Filter kind that fired.
+    kind: String,
+    /// Human-readable reason.
+    reason: String,
+    /// Short printable preview of the matched bytes.
+    sample_short: String,
+}
+
+/// How many recent block entries to seed the dashboard panel with.
+const RECENT_LIMIT: usize = 10;
+
 /// Askama template context for the dashboard page.
 #[derive(Template)]
 #[template(path = "dashboard.html")]
 struct Dash {
     /// Service rows to render in the table.
     services: Vec<ServiceRow>,
+    /// Most recent block-log entries (newest first).
+    recent: Vec<RecentRow>,
 }
 
 /// `GET /` — render the dashboard with the live service table.
@@ -82,7 +101,22 @@ pub async fn get(State(state): State<AppState>) -> Result<Response, WebError> {
             block_count_5m,
         });
     }
-    let tpl = Dash { services };
+    drop(guard);
+
+    let recent: Vec<RecentRow> = state
+        .storage
+        .query_log(&LogFilter::default(), RECENT_LIMIT)?
+        .into_iter()
+        .map(|e| RecentRow {
+            ts: e.ts,
+            sample_short: super::log::sample_short(&e.sample),
+            service: e.service,
+            kind: e.rule_kind,
+            reason: e.reason,
+        })
+        .collect();
+
+    let tpl = Dash { services, recent };
     Ok(match tpl.render() {
         Ok(html) => Html(html).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),

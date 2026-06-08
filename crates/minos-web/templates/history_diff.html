@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Diff v{{ from }} vs v{{ to }}{% endblock %}
+{% block content %}
+<h1>v{{ from }} &rarr; v{{ to }}</h1>
+<div class="diff">
+  <div class="diff-col">
+    <h2>v{{ from }}</h2>
+    <pre class="diff-a">{{ a }}</pre>
+  </div>
+  <div class="diff-col">
+    <h2>v{{ to }}</h2>
+    <pre class="diff-b">{{ b }}</pre>
+  </div>
+</div>
+<p><a href="/history" class="button secondary">&larr; Back to history</a></p>
+{% endblock %}
